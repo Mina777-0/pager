@@ -1,74 +1,108 @@
 import asyncio
 
-# Handle the clients connection to the server
+# Handle client connections with the server
 clients= []
-async def handle_clients(reader, writer):
+async def handle_connections(reader, writer):
     addr= writer.get_extra_info('peername')
+    print(f"Connected to {addr[1]}")
     clients.append(writer)
 
-    print(f"New connection from {addr}")
-
-    while True:
-        try:
+    try:
+        while True:
             data= await reader.read(100)
             if not data:
                 break
+            # Receive a message from a client
             message= data.decode()
-            writer.write('ASK'.encode())
-            print(f"Received {message} from {addr}")
+            print(f"{message} from {addr[1]}")
 
-            for client in clients:
-                if client != writer:
-                    client.write(f"{addr} says {message}".encode())
-                    await client.drain()
-        except asyncio.CancelledError:
-            pass  
+            if message != 'exit':
+                # Send a response to the sender
+                response= "Message Received"
+                writer.write(response.encode())
+                await writer.drain()
 
-    print(f"Closing connection from {addr}")
-    writer.close()
-    await writer.wait_closed()
+                for client in clients:
+                    if client != writer:
+                        client.write(f"{addr[1]} says {message}".encode())
+                        await client.drain()
+
+            if message == 'exit':
+                # Send a response
+                response= "\nGoodbye"
+                writer.write(response.encode())
+                await writer.drain()
+                # Send a message to other clients
+                for client in clients:
+                    if client != writer:
+                        client.write(f"{addr[1]} has left".encode())
+                        await client.drain()
+                # Close the connection
+                writer.close()
+                await writer.wait_closed()
+                break
+
+    except asyncio.CancelledError:
+        print(f"Closing connection with {addr[1]}")
+
     clients.remove(writer)
+    print(f"Connection closed with {addr[1]}")
 
 
-# Handle server
+
+
+# Start a server
 async def start_server():
-    server= await asyncio.start_server(handle_clients, '127.0.0.1', 8888)
+    server= await asyncio.start_server(handle_connections, '127.0.0.1', 8888)
     addr= server.sockets[0].getsockname()
-    print(f"Server on {addr!r}")
+    print(f"Server on {addr}")
 
+    # Let the server work forever until it's stopped manually
     async with server:
         await server.serve_forever()
 
-# Send a message
+
+# Write and send messages
 async def send_message(writer):
     while True:
-        message= input("Enter a message: ")
+        message= await asyncio.to_thread(input, "Write a message: \n")
+
+        if message.lower() == 'exit':
+            writer.write("exit".encode())
+            await writer.drain()
+            break
+
         writer.write(message.encode())
         await writer.drain()
+        await asyncio.sleep(1)
 
-# Receive a message
+# Read and receive messages
 async def receive_message(reader):
     while True:
-        data= await reader.read(1024)
+        data= await reader.read(100)
         if not data:
             break
         message= data.decode()
-        print(f"Message received: {message}")
-    
-
-# Handle connection
-async def client_connection():
-    await asyncio.sleep(2)
-    reader, writer= await asyncio.open_connection('127.0.0.1', 8888)
-    print("Connected to the server")
-    await asyncio.gather(send_message(writer), receive_message(reader))
+        print(f"{message}")
 
 
+# Create connection with the server
+async def open_connection():
+    # Open connection with the server socket
+    reader, writer= await asyncio.open_connection('127.0.01', 8888)
+    addr= writer.get_extra_info('peername')
+    print(f"Connected to the server {addr}")
+    # receive and send messages to the server
+    await asyncio.gather(receive_message(reader), send_message(writer))
+
+
+# Main Connection
 async def main():
-    choice= input("server or client (c/s)? ")
-    if choice == 's':
+    choice= input("Client or server c/s? ")
+    if choice == "s":
         await start_server()
-    elif choice == 'c':
-        await client_connection()
+    elif choice == "c":
+        await open_connection()
 
 asyncio.run(main())
+
