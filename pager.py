@@ -1,5 +1,22 @@
 import asyncio
 
+'''
+from asyncio.streams import StreamReader, StreamWriter
+
+In asyncio, streams are a high-level abstraction for working with asynchronous I/O—specifically, reading from and writing to 
+TCP sockets or other byte streams in a coroutine-friendly way.
+
+Streams in asyncio allow you to work with sockets using async/await instead of manually handling lower-level socket operations. 
+There are two main stream objects:
+
+StreamReader: reads data asynchronously from a stream (e.g. incoming socket data).
+
+StreamWriter: writes data asynchronously to a stream (e.g. sending socket data).
+
+
+'''
+
+
 # Handle client connections with the server
 clients= []
 async def handle_connections(reader, writer):
